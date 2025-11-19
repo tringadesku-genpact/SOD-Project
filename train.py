@@ -1,3 +1,6 @@
+# train.py
+
+import os
 import torch
 import torch.nn as nn
 import numpy as np
@@ -5,21 +8,24 @@ from data_loader import get_dataloaders
 from sod_model import SODNet
 
 
+# Path where the best model will be saved in Google Drive.
+# Make sure in Colab you mounted drive at /content/drive before running this.
+MODEL_PATH = "/content/drive/MyDrive/SOD/best_model.pth"
+
+
 def batch_iou(preds, targets, eps=1e-6):
     """
     Computes IoU for a batch of predicted masks and target masks.
     Both inputs are expected in [0,1] with shape [B, 1, H, W].
     """
-    # Flatten per sample: [B, 1, H, W] -> [B, H*W]
     preds_flat = preds.view(preds.size(0), -1)
     targets_flat = targets.view(targets.size(0), -1)
 
-    # Intersection and union
     intersection = (preds_flat * targets_flat).sum(dim=1)
     union = preds_flat.sum(dim=1) + targets_flat.sum(dim=1) - intersection
 
     iou = (intersection + eps) / (union + eps)
-    return iou.mean()  # average IoU over batch
+    return iou.mean()
 
 
 def main():
@@ -39,6 +45,13 @@ def main():
 
     # Create the model and move it to the selected device.
     model = SODNet().to(device)
+
+    # If a saved model already exists in Drive, load it and continue from there.
+    if os.path.exists(MODEL_PATH):
+        print(f"Found existing model at {MODEL_PATH}, loading weights...")
+        state_dict = torch.load(MODEL_PATH, map_location=device)
+        model.load_state_dict(state_dict)
+        print("Model weights loaded.")
 
     # Loss and optimizer.
     bce_loss = nn.BCELoss()
@@ -114,8 +127,10 @@ def main():
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_without_improvement = 0
-            torch.save(model.state_dict(), "best_model.pth")
-            print("  -> Saved new best model")
+
+            # Save the best model to Google Drive.
+            torch.save(model.state_dict(), MODEL_PATH)
+            print(f"  -> Saved new best model to {MODEL_PATH}")
         else:
             epochs_without_improvement += 1
             print(f"  No improvement for {epochs_without_improvement} epoch(s).")
