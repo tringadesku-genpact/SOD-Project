@@ -2,20 +2,21 @@ import numpy as np
 import torch
 from PIL import Image
 import torchvision.transforms as T
+import torchvision.transforms.functional as TF
 import deeplake
+import random
 
 
 def get_dataloaders(batch_size: int = 8, image_size: int = 128):
     """
     Loads the ECSSD dataset from Deep Lake, splits it into train/val/test,
-    applies basic preprocessing (resize + normalization), and returns
-    PyTorch DataLoaders ready for training.
+    applies preprocessing (resize + normalization) and some basic
+    augmentations for the training set, and returns PyTorch DataLoaders.
     """
 
     # ----------------------------
     # Load the ECSSD dataset
     # ----------------------------
-    # Contains natural images and saliency masks.
     ds = deeplake.load("hub://activeloop/ecssd")
 
     # ----------------------------
@@ -42,19 +43,17 @@ def get_dataloaders(batch_size: int = 8, image_size: int = 128):
     print("Test:", len(test_ds))
 
     # ----------------------------
-    # Transforms for images and masks
+    # Base transforms for val/test
     # ----------------------------
 
-    # Convert images to PIL, resize to a fixed size, and turn into [0–1] tensors.
-    image_tform = T.Compose([
+    # Simple resize + ToTensor for images (no augmentation).
+    val_image_tform = T.Compose([
         T.ToPILImage(),
         T.Resize((image_size, image_size)),
         T.ToTensor(),
     ])
 
-    # Masks are single-channel, so we keep them grayscale.
-    # NEAREST interpolation avoids blurring the mask values.
-    def mask_tform(x):
+    def val_mask_tform(x):
         if x.ndim == 3:
             x = x[..., 0]
 
@@ -65,28 +64,89 @@ def get_dataloaders(batch_size: int = 8, image_size: int = 128):
         return torch.from_numpy(mask_np).unsqueeze(0)  # [1, H, W]
 
     # ----------------------------
+    # Train-time joint transform (image + mask together)
+    # ----------------------------
+
+    color_jitter = T.ColorJitter(brightness=0.2, contrast=0.2)
+
+    def train_transform(sample):
+        """
+        Joint transform so that image and mask get the same geometric changes.
+        Applies:
+        - resize
+        - random horizontal flip
+        - random crop + resize back
+        - brightness/contrast jitter (image only)
+        """
+
+        image = sample["images"]
+        mask  = sample["masks"]
+
+        # Convert to PIL images.
+        img = Image.fromarray(image)
+        if mask.ndim == 3:
+            mask_arr = mask[..., 0]
+        else:
+            mask_arr = mask
+        mask_img = Image.fromarray(mask_arr)
+
+        # 1) Resize both to (image_size, image_size).
+        img = img.resize((image_size, image_size), Image.BILINEAR)
+        mask_img = mask_img.resize((image_size, image_size), Image.NEAREST)
+
+        # 2) Random horizontal flip (same flip for image and mask).
+        if random.random() < 0.5:
+            img = TF.hflip(img)
+            mask_img = TF.hflip(mask_img)
+
+        # 3) Random crop (slightly smaller patch) then resize back.
+        # This simulates random zoom/crop.
+        crop_size = int(image_size * 0.9)  # e.g. 90% of the size
+        i, j, h, w = T.RandomCrop.get_params(img, output_size=(crop_size, crop_size))
+
+        img = TF.crop(img, i, j, h, w)
+        mask_img = TF.crop(mask_img, i, j, h, w)
+
+        img = img.resize((image_size, image_size), Image.BILINEAR)
+        mask_img = mask_img.resize((image_size, image_size), Image.NEAREST)
+
+        # 4) Brightness/contrast jitter only on the image.
+        img = color_jitter(img)
+
+        # 5) Convert to tensors.
+        img_tensor = T.ToTensor()(img)  # [3, H, W], in [0,1]
+
+        mask_np = np.array(mask_img, dtype=np.float32) / 255.0
+        mask_tensor = torch.from_numpy(mask_np).unsqueeze(0)  # [1, H, W]
+
+        return {
+            "images": img_tensor,
+            "masks": mask_tensor,
+        }
+
+    # ----------------------------
     # Build PyTorch DataLoaders via Deep Lake
     # ----------------------------
 
+    # Train loader uses the joint train_transform so both image & mask
+    # get the same random horizontal flip and crop.
     train_loader = train_ds.pytorch(
         batch_size=batch_size,
         shuffle=True,
         num_workers=0,
         tensors=["images", "masks"],
-        transform={
-            "images": image_tform,
-            "masks":  mask_tform,
-        },
+        transform=train_transform,
     )
 
+    # Val / test loaders keep things deterministic (no augmentation).
     val_loader = val_ds.pytorch(
         batch_size=batch_size,
         shuffle=False,
         num_workers=0,
         tensors=["images", "masks"],
         transform={
-            "images": image_tform,
-            "masks":  mask_tform,
+            "images": val_image_tform,
+            "masks":  val_mask_tform,
         },
     )
 
@@ -96,8 +156,8 @@ def get_dataloaders(batch_size: int = 8, image_size: int = 128):
         num_workers=0,
         tensors=["images", "masks"],
         transform={
-            "images": image_tform,
-            "masks":  mask_tform,
+            "images": val_image_tform,
+            "masks":  val_mask_tform,
         },
     )
 
