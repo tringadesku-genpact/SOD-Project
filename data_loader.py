@@ -104,7 +104,7 @@ def get_dataloaders(
             "Make sure you exported ECSSD from Deep Lake first."
         )
 
-    img_paths = sorted(glob(os.path.join(img_dir, "*.jpg")))
+    img_paths = sorted(glob(os.path.join(img_dir, "*.png")))
     mask_paths = sorted(glob(os.path.join(mask_dir, "*.png")))
 
     if len(img_paths) == 0 or len(img_paths) != len(mask_paths):
