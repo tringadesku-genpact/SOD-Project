@@ -9,6 +9,7 @@ from PIL import Image
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 
+from config import DEFAULT_DATASET_ROOT
 
 class ECSSDDataset(Dataset):
     """
@@ -81,7 +82,7 @@ class ECSSDDataset(Dataset):
 def get_dataloaders(
     batch_size: int = 8,
     image_size: int = 128,
-    dataset_root: str = "/content/dataset_ecssd",
+    dataset_root: str | os.PathLike = DEFAULT_DATASET_ROOT,
     limit: int | None = None,
     num_workers: int = 2,
 ):
@@ -95,6 +96,7 @@ def get_dataloaders(
       (handy for faster debug or demo).
     """
 
+    dataset_root = os.fspath(dataset_root)
     img_dir = os.path.join(dataset_root, "images")
     mask_dir = os.path.join(dataset_root, "masks")
 

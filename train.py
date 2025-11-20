@@ -1,11 +1,10 @@
-# train.py
-
 import os
 import torch
 import torch.nn as nn
 import numpy as np
 from data_loader import get_dataloaders
 from sod_model import SODNet
+from config import IMAGE_SIZE, BATCH_SIZE, NUM_EPOCHS, NUM_WORKERS, get_paths
 
 
 # Path where the best model will be saved in Google Drive.
@@ -37,19 +36,31 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Using device:", device)
 
+    # Resolve paths depending on environment (Colab vs local).
+    dataset_root, model_dir = get_paths()
+    print("Dataset root:", dataset_root)
+    print("Model dir:", model_dir)
+
+    # Make sure model directory exists before trying to save.
+    os.makedirs(model_dir, exist_ok=True)
+    model_path = os.path.join(model_dir, "best_model.pth")
+
     # Load train / val / test loaders from data_loader.py
     train_loader, val_loader, test_loader = get_dataloaders(
-        batch_size=8,
-        image_size=128,
+        batch_size=BATCH_SIZE,
+        image_size=IMAGE_SIZE,
+        dataset_root=dataset_root,
+        limit=None,            # or e.g. 300 for a faster demo
+        num_workers=NUM_WORKERS,
     )
 
     # Create the model and move it to the selected device.
     model = SODNet().to(device)
 
     # If a saved model already exists in Drive, load it and continue from there.
-    if os.path.exists(MODEL_PATH):
-        print(f"Found existing model at {MODEL_PATH}, loading weights...")
-        state_dict = torch.load(MODEL_PATH, map_location=device)
+    if os.path.exists(model_path):
+        print(f"Found existing model at {model_path}, loading weights...")
+        state_dict = torch.load(model_path, map_location=device)
         model.load_state_dict(state_dict)
         print("Model weights loaded.")
 
@@ -58,7 +69,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     # Training settings.
-    num_epochs = 20
+    num_epochs = NUM_EPOCHS
     patience = 5  # for early stopping
     best_val_loss = float("inf")
     epochs_without_improvement = 0
@@ -128,9 +139,11 @@ def main():
             best_val_loss = avg_val_loss
             epochs_without_improvement = 0
 
-            # Save the best model to Google Drive.
-            torch.save(model.state_dict(), MODEL_PATH)
-            print(f"  -> Saved new best model to {MODEL_PATH}")
+            # Ensure directory exists (already done above, but safe to keep)
+            os.makedirs(model_dir, exist_ok=True)
+
+            torch.save(model.state_dict(), model_path)
+            print(f"  -> Saved new best model to {model_path}")
         else:
             epochs_without_improvement += 1
             print(f"  No improvement for {epochs_without_improvement} epoch(s).")
