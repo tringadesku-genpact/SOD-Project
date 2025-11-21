@@ -25,7 +25,7 @@ def get_paths():
     return str(DATASET_DIR), str(MODELS_DIR)
 
 # Hyperparameters
-IMAGE_SIZE    = 224   # higher res for better detail
+IMAGE_SIZE    = 128   # higher res for better detail
 BATCH_SIZE    = 8
 NUM_EPOCHS    = 25
 LEARNING_RATE = 1e-3

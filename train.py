@@ -92,7 +92,7 @@ def main():
     # Get train / val / test loaders from the local PNG dataset.
     train_loader, val_loader, _ = get_dataloaders(
         batch_size=BATCH_SIZE,
-        limit=None,          # you can set e.g. 300 here for quicker tests
+        limit=400,          # you can set e.g. 300 here for quicker tests
         num_workers=NUM_WORKERS,
     )
 
