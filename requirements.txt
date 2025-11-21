@@ -1,10 +1,8 @@
 torch
 torchvision
-torchaudio
 numpy
-opencv-python
+Pillow
 matplotlib
 tqdm
-scikit-learn
 deeplake<4
-Pillow
+segmentation-models-pytorch

@@ -1,104 +1,95 @@
 import os
-from pathlib import Path
-
-import numpy as np
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 
+from config import MODELS_DIR, OUTPUTS_DIR, BATCH_SIZE, NUM_WORKERS
 from data_loader import get_dataloaders
-from sod_model import SODNet
-from config import IMAGE_SIZE, BATCH_SIZE, NUM_WORKERS, get_paths
+
+# Choose model version to evaluate:
+# from sod_model import SODNetBaseline as SODNet
+from sod_model import SODNetImproved as SODNet
+
+from train import (
+    soft_iou_from_logits, 
+    hard_iou_from_logits
+)
 
 
-def batch_iou(preds, targets, eps=1e-6):
-    """
-    Same IoU as in train.py.
-    Expects tensors in [0,1], shape [B, 1, H, W].
-    """
-    preds_flat = preds.view(preds.size(0), -1)
-    targets_flat = targets.view(targets.size(0), -1)
+def evaluate_and_visualize(num_samples: int = 3):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print("Using device:", device)
 
-    intersection = (preds_flat * targets_flat).sum(dim=1)
-    union = preds_flat.sum(dim=1) + targets_flat.sum(dim=1) - intersection
+    model_path = os.path.join(MODELS_DIR, "best_model.pth")
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(
+            f"{model_path} not found. Train the model first (python train.py)."
+        )
 
-    iou = (intersection + eps) / (union + eps)
-    return iou.mean()
+    # Only need test loader
+    _, _, test_loader = get_dataloaders(
+        batch_size=BATCH_SIZE,
+        limit=None,
+        num_workers=NUM_WORKERS,
+    )
 
-
-def evaluate(model, test_loader, device):
-    """
-    Runs the model on the whole test set and prints average loss + IoU.
-    """
+    model = SODNet().to(device)
+    state_dict = torch.load(model_path, map_location=device)
+    model.load_state_dict(state_dict)
     model.eval()
-    bce_loss = nn.BCELoss()
+    print("Loaded model weights.")
+
+    # Same loss as used in training
+    bce_loss = nn.BCEWithLogitsLoss()
 
     total_loss = 0.0
     total_iou = 0.0
-    num_batches = 0
+    n_batches = 0
 
+    # --- Evaluate whole test set ---
     with torch.no_grad():
         for batch in test_loader:
             images = batch["images"].to(device)
-            masks = batch["masks"].to(device)
+            masks  = batch["masks"].to(device)
 
-            outputs = model(images)
+            logits = model(images)
 
-            loss_bce = bce_loss(outputs, masks)
-            iou = batch_iou(outputs, masks)
-
-            loss = loss_bce + 0.5 * (1.0 - iou)
+            loss_bce = bce_loss(logits, masks)
+            iou_soft = soft_iou_from_logits(logits, masks)
+            loss = loss_bce + 0.5 * (1.0 - iou_soft)
 
             total_loss += loss.item()
-            total_iou += iou.item()
-            num_batches += 1
+            total_iou  += hard_iou_from_logits(logits, masks).item()
+            n_batches += 1
 
-    avg_loss = total_loss / max(1, num_batches)
-    avg_iou = total_iou / max(1, num_batches)
+    avg_loss = total_loss / max(1, n_batches)
+    avg_iou  = total_iou / max(1, n_batches)
 
-    print(f"\nTest results:")
+    print("\nTest results:")
     print(f"  Test loss: {avg_loss:.4f}")
     print(f"  Test IoU:  {avg_iou:.4f}")
 
+    # --- Save visualizations ---
+    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
-def visualize_predictions(model, test_loader, device, num_samples=3, save_dir=None):
-    """
-    Takes a few samples from the test set and shows:
-      - original image
-      - ground truth mask
-      - predicted mask
-
-    If save_dir is given, saves the figures there instead of just showing them.
-    """
-    model.eval()
-
-    # Just grab the first batch
     batch = next(iter(test_loader))
     images = batch["images"].to(device)
-    masks = batch["masks"].to(device)
+    masks  = batch["masks"].to(device)
 
     with torch.no_grad():
-        preds = model(images)  # [B, 1, H, W]
+        logits = model(images)
+        probs = torch.sigmoid(logits)
 
-    # Move to CPU and numpy for plotting
     images_np = images.cpu().numpy()
-    masks_np = masks.cpu().numpy()
-    preds_np = preds.cpu().numpy()
+    masks_np  = masks.cpu().numpy()
+    preds_np  = (probs.cpu().numpy() > 0.5).astype(float)
 
-    # Simple threshold for visualization
-    preds_bin = (preds_np > 0.5).astype(np.float32)
-
-    # Make sure we don't ask for more samples than we have
-    num_samples = min(num_samples, images_np.shape[0])
-
-    if save_dir is not None:
-        save_dir = Path(save_dir)
-        save_dir.mkdir(parents=True, exist_ok=True)
+    num_samples = min(num_samples, len(images_np))
 
     for i in range(num_samples):
-        img = images_np[i].transpose(1, 2, 0)           # [C,H,W] -> [H,W,C]
-        mask = masks_np[i, 0]                           # [1,H,W] -> [H,W]
-        pred = preds_bin[i, 0]                          # [1,H,W] -> [H,W]
+        img = images_np[i].transpose(1, 2, 0)
+        mask = masks_np[i, 0]
+        pred = preds_np[i, 0]
 
         fig, axes = plt.subplots(1, 3, figsize=(9, 3))
 
@@ -111,64 +102,16 @@ def visualize_predictions(model, test_loader, device, num_samples=3, save_dir=No
         axes[1].axis("off")
 
         axes[2].imshow(pred, cmap="gray")
-        axes[2].set_title("Prediction (thr=0.5)")
+        axes[2].set_title("Prediction (0.5 threshold)")
         axes[2].axis("off")
 
-        plt.tight_layout()
+        fig.tight_layout()
+        out_path = OUTPUTS_DIR / f"sample_{i}.png"
+        fig.savefig(out_path)
+        plt.close(fig)
 
-        if save_dir is not None:
-            out_path = save_dir / f"sample_{i}.png"
-            plt.savefig(out_path)
-            plt.close(fig)
-            print(f"Saved {out_path}")
-        else:
-            plt.show()
-
-
-def main():
-    # Device
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print("Using device:", device)
-
-    # Resolve paths (Colab vs local)
-    dataset_root, model_dir = get_paths()
-    model_path = os.path.join(model_dir, "best_model.pth")
-    print("Dataset root:", dataset_root)
-    print("Model path:", model_path)
-
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(
-            f"Model weights not found at {model_path}. "
-            "Train the model first (python train.py)."
-        )
-
-    # Data: we only need test_loader here
-    _, _, test_loader = get_dataloaders(
-        batch_size=BATCH_SIZE,
-        image_size=IMAGE_SIZE,
-        dataset_root=dataset_root,
-        limit=None,          # or smaller for quick debug
-        num_workers=NUM_WORKERS,
-    )
-
-    # Model
-    model = SODNet().to(device)
-    state_dict = torch.load(model_path, map_location=device)
-    model.load_state_dict(state_dict)
-    print("Loaded model weights.")
-
-    # 1) Quantitative metrics
-    evaluate(model, test_loader, device)
-
-    # 2) A few qualitative examples
-    visualize_predictions(
-        model,
-        test_loader,
-        device,
-        num_samples=3,
-        save_dir="outputs"   # will create /outputs and save images there
-    )
+        print(f"Saved {out_path}")
 
 
 if __name__ == "__main__":
-    main()
+    evaluate_and_visualize(num_samples=3)
