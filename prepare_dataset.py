@@ -51,7 +51,7 @@ def main():
 
         img = img.astype("uint8")
         img_pil = Image.fromarray(img)
-        img_pil.save(img_dir / f"{i:04d}.png")
+        img_pil.save(img_dir / f"{i:04d}.jpg")
 
         # --- MASK ---
         mask = np.asarray(mask)
