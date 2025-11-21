@@ -94,7 +94,7 @@ def _get_image_mask_paths() -> Tuple[List[str], List[str]]:
             "Run prepare_dataset.py first or copy your dataset there."
         )
 
-    img_paths = sorted(glob(os.path.join(img_dir, "*.jng")))
+    img_paths = sorted(glob(os.path.join(img_dir, "*.jpg")))
     mask_paths = sorted(glob(os.path.join(mask_dir, "*.png")))
 
     if len(img_paths) == 0 or len(img_paths) != len(mask_paths):
