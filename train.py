@@ -24,6 +24,7 @@ from data_loader import get_dataloaders
 # Give this run a name so you don't overwrite others
 EXPERIMENT_NAME = "sod_improved_dropout03_full"  # <-- change this per experiment if you want
 
+
 # Choose which architecture to use:
 # from sod_model import SODNetBaseline as SODNet
 from sod_model import SODNetImproved as SODNet   # improved model with Dropout
