@@ -11,7 +11,8 @@ from data_loader import get_dataloaders
 
 # Choose model version to evaluate:
 # from sod_model import SODNetBaseline as SODNet
-from sod_model import SODNetImproved as SODNet
+# from sod_model import SODNetImproved as SODNet
+from sod_model import SODNetImprovedV2 as SODNet
 
 # Use the same experiment name as in train.py
 from train import soft_iou_from_logits, hard_iou_from_logits  # reuse helpers
