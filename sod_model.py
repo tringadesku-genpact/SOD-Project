@@ -3,10 +3,44 @@ import torch.nn as nn
 
 
 class DoubleConv(nn.Module):
-    """
-    Two conv layers + BatchNorm + ReLU.
-    Optional dropout at the end of the block.
-    """
+    def __init__(
+        self,
+        in_ch: int,
+        out_ch: int,
+        p_dropout: float = 0.0,
+        residual: bool = False,
+    ):
+        super().__init__()
+
+        layers = [
+            nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+        ]
+
+        if p_dropout > 0.0:
+            layers.append(nn.Dropout2d(p=p_dropout))
+
+        self.block = nn.Sequential(*layers)
+
+        # Add projection if residual enabled
+        self.use_residual = residual
+        if residual:
+            if in_ch != out_ch:
+                self.res_conv = nn.Conv2d(in_ch, out_ch, kernel_size=1)
+            else:
+                self.res_conv = nn.Identity()
+        else:
+            self.res_conv = None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = self.block(x)
+        if self.use_residual:
+            out = out + self.res_conv(x)
+        return out
 
     def __init__(self, in_ch: int, out_ch: int, p_dropout: float = 0.0):
         super().__init__()
