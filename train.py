@@ -18,14 +18,15 @@ from config import (
 from data_loader import get_dataloaders
 
 # Give this run a name so you don't overwrite others
-# EXPERIMENT_NAME = "sod_improved_dropout03_full"
-EXPERIMENT_NAME = "sod_improved_v2"
+# EXPERIMENT_NAME = "best_model"
+EXPERIMENT_NAME = "sod_improved_dropout03_full"
+# EXPERIMENT_NAME = "sod_improved_v2"
 
 
 # Choose which model to use:
 # from sod_model import SODNetBaseline as SODNet
-# from sod_model import SODNetImproved as SODNet
-from sod_model import SODNetImprovedV2 as SODNet
+from sod_model import SODNetImproved as SODNet
+# from sod_model import SODNetImprovedV2 as SODNet
 
 
 # IoU helpers

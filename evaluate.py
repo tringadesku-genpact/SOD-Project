@@ -142,7 +142,7 @@ def evaluate_and_visualize(num_samples: int = 3):
     print(f"  Test Precision:  {avg_prec:.4f}")
     print(f"  Test Recall:     {avg_rec:.4f}")
     print(f"  Test F1-score:   {avg_f1:.4f}")
-    print(f"  Test MAE:        {avg_mae:.4f}")
+    print(f"  Test Mean Absolute Error:        {avg_mae:.4f}")
 
     # Visualize some outputs
     # To avoid always using the first batch, pick a random batch index
