@@ -17,25 +17,18 @@ from config import (
 )
 from data_loader import get_dataloaders
 
-# --------------------------------------------------
-# Choose experiment name + which model to train
-# --------------------------------------------------
-
 # Give this run a name so you don't overwrite others
 # EXPERIMENT_NAME = "sod_improved_dropout03_full"
 EXPERIMENT_NAME = "sod_improved_v2"
 
 
-# Choose which architecture to use:
+# Choose which model to use:
 # from sod_model import SODNetBaseline as SODNet
 # from sod_model import SODNetImproved as SODNet
 from sod_model import SODNetImprovedV2 as SODNet
 
 
-# --------------------------------------------------
-# IoU helpers (used in training + evaluate.py)
-# --------------------------------------------------
-
+# IoU helpers
 def soft_iou_from_logits(logits: torch.Tensor,
                          targets: torch.Tensor,
                          eps: float = 1e-6) -> torch.Tensor:
@@ -92,9 +85,7 @@ def dice_loss_from_logits(logits: torch.Tensor,
     return 1 - dice.mean()
 
 
-# --------------------------------------------------
-# Training logic
-# --------------------------------------------------
+
 
 def main():
     # Reproducibility
@@ -151,9 +142,6 @@ def main():
     for epoch in range(1, NUM_EPOCHS + 1):
         print(f"\nEpoch {epoch}/{NUM_EPOCHS}")
 
-        # -------------------------
-        # Training
-        # -------------------------
         model.train()
         train_loss = 0.0
         train_iou = 0.0
@@ -190,9 +178,7 @@ def main():
         avg_train_iou  = train_iou / len(train_loader)
         print(f"  Train loss: {avg_train_loss:.4f} | Train IoU: {avg_train_iou:.4f}")
 
-        # -------------------------
         # Validation
-        # -------------------------
         model.eval()
         val_loss = 0.0
         val_iou  = 0.0
@@ -229,9 +215,7 @@ def main():
                 f"{avg_val_iou:.6f}",
             ])
 
-        # -------------------------
         # Early stopping + save best model
-        # -------------------------
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_no_improve = 0

@@ -1,12 +1,8 @@
 from pathlib import Path
 
-# This file controls where data/models/outputs live.
-
-# Folder where the repo itself lives
+# Repo folder
 BASE_DIR = Path(__file__).resolve().parent
 
-# If we're in Colab with Drive mounted, use that.
-# You can change "SOD" to whatever folder name you like in MyDrive.
 COLAB_DRIVE_ROOT = Path("/content/drive/MyDrive/SOD")
 
 if COLAB_DRIVE_ROOT.exists():
@@ -18,14 +14,13 @@ else:
 # Paths for dataset, models, and outputs
 DATASET_DIR = STORAGE_ROOT / "dataset_ecssd"
 MODELS_DIR  = STORAGE_ROOT / "models"
-OUTPUTS_DIR = STORAGE_ROOT / "outputs"  # you can keep this in BASE_DIR if you prefer
+OUTPUTS_DIR = STORAGE_ROOT / "outputs" 
 
 def get_paths():
-    """Return (dataset_root, model_dir) as strings for compatibility."""
     return str(DATASET_DIR), str(MODELS_DIR)
 
 # Hyperparameters
-IMAGE_SIZE    = 128   # higher res for better detail
+IMAGE_SIZE    = 128   # switch to 224 for testing
 BATCH_SIZE    = 8
 NUM_EPOCHS    = 25
 LEARNING_RATE = 1e-3

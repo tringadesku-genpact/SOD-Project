@@ -23,10 +23,7 @@ def compute_metrics_over_batch(logits: torch.Tensor,
                                targets: torch.Tensor,
                                bce_loss: nn.Module,
                                eps: float = 1e-6):
-    """
-    Computes loss + IoU + Precision + Recall + F1 + MAE for a batch.
-    All metrics are returned as scalars (Python floats).
-    """
+
     # BCE + IoU-based loss, same style as training (but no 0.5 factor here;
     # we'll construct final loss outside if we want).
     loss_bce = bce_loss(logits, targets)
@@ -102,7 +99,6 @@ def evaluate_and_visualize(num_samples: int = 3):
     # Loss function
     bce_loss = nn.BCEWithLogitsLoss()
 
-    # ---- Aggregate metrics on full test set ----
     total_loss = 0.0
     total_iou  = 0.0
     total_prec = 0.0
@@ -148,7 +144,7 @@ def evaluate_and_visualize(num_samples: int = 3):
     print(f"  Test F1-score:   {avg_f1:.4f}")
     print(f"  Test MAE:        {avg_mae:.4f}")
 
-    # ---- Visualize some predictions ----
+    # Visualize some outputs
     # To avoid always using the first batch, pick a random batch index
     all_batches = list(test_loader)
     chosen_batch_idx = random.randint(0, len(all_batches) - 1)
